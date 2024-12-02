@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-app-blog-project
+
+  Sample SAM Template for sam-app-blog-project
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+
+    # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
+    LoggingConfig:
+      LogFormat: JSON
+
+Resources:
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: MyApi
+      StageName: dev
+      Cors:
+        AllowOrigin: "'*'"
+        AllowMethods: "'GET,POST,DELETE,PATCH,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+
+  CreateCommentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: createComment2
+      CodeUri: src/createComment/
+      Handler: app.handler
+      Runtime: nodejs20.x
+      Policies:
+        - DynamoDBWritePolicy: 
+            TableName: Comments
+      Architectures:
+      - x86_64
+      Events:
+        CreateComment:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /insertComment
+            Method: POST
+  
+  GetCommentsFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      FunctionName: getComments2
+      CodeUri: src/getComments/
+      Handler: app.handler
+      Runtime: nodejs20.x
+      Policies:
+       - DynamoDBReadPolicy:
+          TableName: Comments
+      Architectures:
+      - x86_64
+      Events:
+        GetComment:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /getComments
+            Method: GET
+            
+  DeleteCommentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: deleteComment2
+      CodeUri: src/deleteComment/
+      Handler: app.handler
+      Runtime: nodejs20.x
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:DeleteItem
+              Resource: arn:aws:dynamodb:us-east-1:744620704509:table/Comments
+      Architectures:
+      - x86_64
+      Events:
+        DeleteComment:
+          Type: Api 
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /deleteComment/{id}
+            Method: DELETE
+
+  UpdateCommentFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      FunctionName: updateComment2
+      CodeUri: src/updateComment/
+      Handler: app.handler
+      Runtime: nodejs20.x
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: Comments
+      Architectures:
+      - x86_64
+      Events:
+        UpdateComment:
+          Type: Api 
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /updateComment/{id}
+            Method: PATCH
+
+  MyDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Comments2
+      AttributeDefinitions:
+        - AttributeName: commentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: commentId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  ApplicationResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name:
+        Fn::Sub: ApplicationInsights-SAM-${AWS::StackName}
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+  ApplicationInsightsMonitoring:
+    Type: AWS::ApplicationInsights::Application
+    Properties:
+      ResourceGroupName:
+        Ref: ApplicationResourceGroup
+      AutoConfigurationEnabled: 'true'
+# Outputs:
+#   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+#   # Find out more about other implicit resources you can reference within SAM
+#   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+#   HelloWorldApi:
+#     Description: API Gateway endpoint URL for Prod stage for Hello World function
+#     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+#   HelloWorldFunction:
+#     Description: Hello World Lambda Function ARN
+#     Value: !GetAtt HelloWorldFunction.Arn
+#   HelloWorldFunctionIamRole:
+#     Description: Implicit IAM Role created for Hello World function
+#     Value: !GetAtt HelloWorldFunctionRole.Arn
